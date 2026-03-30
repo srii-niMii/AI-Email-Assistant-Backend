@@ -6,13 +6,23 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.util.retry.Retry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
 @Service
 public class AIService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AIService.class);
 
     private final WebClient webClient;
 
@@ -33,32 +43,39 @@ public class AIService {
 
     @Cacheable(
             value = "aiResponses",
-            key = "#messageRequest.content + '-' + #messageRequest.tone"
+            key = "#messageRequest.content + '-' + #messageRequest.tone + '-' + #email"
     )
 
 
-    public String sendMessage(MessageRequest messageRequest) {
+    public String sendMessage(MessageRequest messageRequest, String email) {
         String prompt = buildPrompt(messageRequest);
-        String requestBody = String.format("""
-                {
-                  "contents": [
-                    {
-                      "parts": [
-                        {
-                          "text": "%s"
-                        }
-                      ]
-                    }
-                  ]
-                }""", prompt);
+        Map<String, Object> requestBody = Map.of(
+                "contents", List.of(
+                        Map.of(
+                                "parts", List.of(
+                                        Map.of("text", prompt)
+                                )
+                        )
+                )
+        );
 
         String response = webClient.post()
                 .uri(apiUrl + "?key=" + apiKey)
-//                .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                .contentType(MediaType.valueOf("application/json"))
+                .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToMono(String.class)
+                .retryWhen(
+                        Retry.backoff(5, Duration.ofSeconds(1))
+                                .maxBackoff(Duration.ofSeconds(32))
+                                .jitter(0.5)
+                                .filter(ex -> ex instanceof WebClientResponseException.TooManyRequests)
+                                .doBeforeRetry(signal -> logger.warn(
+                                        "Rate limited (429). Retrying attempt {}/10 after backoff delay",
+                                        signal.totalRetries() + 1
+                                ))
+                )
+                .doOnError(ex -> logger.error("AI service call failed after all retries", ex))
                 .block();
         return extractResponseContent(response);
     }
@@ -70,7 +87,7 @@ public class AIService {
             JsonNode root = mapper.readTree(response);
 
             JsonNode candidates = root.path("candidates");
-            if (!candidates.isArray() || candidates.size() == 0) {
+            if (!candidates.isArray() || candidates.isEmpty()) {
                 throw new RuntimeException("No candidates found in AI response");
             }
 
@@ -81,7 +98,7 @@ public class AIService {
             }
 
             JsonNode parts = contentNode.path("parts");
-            if (!parts.isArray() || parts.size() == 0) {
+            if (!parts.isArray() || parts.isEmpty()) {
                 throw new RuntimeException("No parts found in AI response");
             }
 
@@ -93,42 +110,72 @@ public class AIService {
 
 
     private String buildPrompt(MessageRequest messageRequest) {
-        StringBuilder prompt = new StringBuilder();
 
         String tone = sanitizeTone(messageRequest.getTone());
-        prompt.append("Respond in a ").append(tone).append(" tone.\n");
+        String emailContent = messageRequest.getContent();
 
-        prompt.append("""
-                          You are an AI that generates high-quality email replies.
+        return """
+                You are an AI assistant specialized in generating high-quality email replies.
                 
-                Guidelines:
-                1. Generate a complete email reply with Subject and Body.
-                2. The tone MUST strictly follow the user-specified tone: <TONE>.
-                3. Adapt wording, sentence structure, and style based on tone:
-                   - Formal: professional, respectful, no contractions (e.g., "I am", "We would like").
-                   - Casual: friendly, conversational, may use contractions (e.g., "I'm", "Thanks!").
-                   - Apologetic: express regret clearly and politely.
-                   - Assertive: confident, direct, but still respectful.
-                   - Friendly: warm, positive, engaging.
-                4. Do NOT mix tones. Stick to one consistent tone throughout.
-                5. Do NOT copy phrases directly from the original email unless necessary.
-                6. Keep sentences clear, natural, and concise.
-                7. Ensure proper email format:
+                ==============================
+                INPUT:
+                Original Email:
+                """ + emailContent + """
+                
+                Desired Tone:
+                """ + tone + """
+                ==============================
+                
+                INSTRUCTIONS:
+                
+                1. Carefully read and understand the original email.
+                
+                2. Generate a reply that directly addresses all key points, questions, or requests.
+                
+                3. Tone Rules (STRICT):
+                   - Use ONLY the specified tone: """ + tone + """
+                   - Do NOT mix tones.
+                
+                   Tone Guidelines:
+                   - formal → professional, respectful, no contractions
+                   - casual → conversational, relaxed, may use contractions
+                   - apologetic → express clear regret and offer resolution
+                   - assertive → confident, direct, but polite
+                   - friendly → warm and engaging
+                   - professional → neutral, business-appropriate tone
+                
+                4. Writing Rules:
+                   - Keep it concise but complete
+                   - Do NOT copy sentences from the original email
+                   - Use natural, human-like language
+                   - Avoid unnecessary filler
+                
+                5. Email Structure (MANDATORY):
+                   - Subject line
                    - Greeting
-                   - Body (well-structured paragraphs)
+                   - Body (clear paragraphs)
                    - Closing line
+                   - Signature: [Your Name]
                 
-                Output format:
+                6. If details are missing, use placeholders like:
+                   [Recipient Name], [Details]
                 
-                Generated Response:
+                7. DO NOT include any explanation outside the email.
                 
-                Subject: <clear and relevant subject line>
+                ==============================
+                OUTPUT FORMAT (STRICT):
+                
+                Subject: <clear subject>
                 
                 Body:
-                <full email reply with proper formatting>
-                """);
-
-        return prompt.toString();
+                Dear [Recipient Name],
+                
+                <Your response>
+                
+                Best regards,  
+                [Your Name]
+                ==============================
+                """;
     }
 
     private String sanitizeTone(String tone) {

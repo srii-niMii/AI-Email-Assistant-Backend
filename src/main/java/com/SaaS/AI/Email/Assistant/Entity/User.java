@@ -1,12 +1,12 @@
 package com.SaaS.AI.Email.Assistant.Entity;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -27,9 +27,11 @@ public class User {
     @Column(unique = true)
     private String email;
 
+    @Column(nullable = true)
     private String password;
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @JsonIgnore
     private List<EmailThread> threads;
 }

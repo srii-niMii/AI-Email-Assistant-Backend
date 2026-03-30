@@ -5,7 +5,6 @@ import com.SaaS.AI.Email.Assistant.Repository.UserRepo;
 import com.SaaS.AI.Email.Assistant.dto.LoginRequest;
 import com.SaaS.AI.Email.Assistant.dto.RegisterRequest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -21,20 +20,21 @@ public class AuthService {
     @Autowired
     private JwtService jwtUtil;
 
-public void register(RegisterRequest request){
-    if(userRepo.findByEmail(request.getEmail()).isPresent()){
-        throw new RuntimeException("User Already Exists");
-    }
+    public String register(RegisterRequest request) {
+        if (userRepo.findByEmail(request.getEmail()).isPresent()) {
+            throw new RuntimeException("User Already Exists");
+        }
 
-    User user=User.builder()
-            .name(request.getName())
-            .email(request.getEmail())
-            .password(PasswordEncoder.encode(request.getPassword()))
-            .createdAt(LocalDateTime.now())
-            .build();
+        User user = User.builder()
+                .name(request.getName())
+                .email(request.getEmail())
+                .password(PasswordEncoder.encode(request.getPassword()))
+                .createdAt(LocalDateTime.now())
+                .build();
 
         userRepo.save(user);
 
+        return jwtUtil.generateToken(user.getEmail());
     }
 
 
@@ -48,6 +48,5 @@ public void register(RegisterRequest request){
 
 
     }
-
 
 }

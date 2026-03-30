@@ -1,11 +1,11 @@
 package com.SaaS.AI.Email.Assistant.Entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -29,6 +29,7 @@ public class Message {
 
     @ManyToOne
     @JoinColumn(name = "thread_id")
+    @JsonBackReference
     private EmailThread thread;
 
 }
