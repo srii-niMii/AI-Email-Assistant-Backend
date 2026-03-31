@@ -26,10 +26,10 @@ public class AIService {
 
     private final WebClient webClient;
 
-    @Value("${ai.google.genai.api-key}")
+    @Value("${GENAI_API_KEY}")
     private String apiKey;
 
-    @Value("${ai.google.genai.api.url}")
+    @Value("${GENAI_API_URL}")
     private String apiUrl;
 
     private static final Set<String> ALLOWED_TONES = Set.of(
