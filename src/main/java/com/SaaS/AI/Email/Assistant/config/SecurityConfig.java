@@ -130,7 +130,7 @@ public class SecurityConfig {
                 String email = oauth2User.getAttribute("email");
                 String token = jwtService.generateToken(email);
 
-                response.sendRedirect("http://localhost:5173/oauth2/redirect?token=" + token);
+                response.sendRedirect("https://ai-email-assistant-frontend-n.vercel.app/oauth2/redirect?token=" + token);
 
             }
         };
