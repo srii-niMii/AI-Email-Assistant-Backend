@@ -8,6 +8,6 @@ public class Home {
 
     @RequestMapping("/")
     public String main() {
-        return ("Hello World");
+        return ("AI Email Assistant");
     }
 }
