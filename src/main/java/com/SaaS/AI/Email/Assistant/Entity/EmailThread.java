@@ -15,7 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 @Data
 @Builder
-
+@Table(name = "email_thread")
 public class EmailThread {
 
     @Id

@@ -28,6 +28,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -130,7 +132,10 @@ public class SecurityConfig {
                 String email = oauth2User.getAttribute("email");
                 String token = jwtService.generateToken(email);
 
-                response.sendRedirect("https://ai-email-assistant-frontend-n.vercel.app/oauth2/redirect?token=" + token);
+                response.sendRedirect(
+                        "https://ai-email-assistant-frontend-n.vercel.app/oauth2/redirect?token=" +
+                                URLEncoder.encode(token, StandardCharsets.UTF_8)
+                );
 
             }
         };

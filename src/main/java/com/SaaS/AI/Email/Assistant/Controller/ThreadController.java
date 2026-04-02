@@ -40,7 +40,7 @@ public class ThreadController {
 
         EmailThread savedThread = threadService.createThread(threadRequest, user.getEmail());
 
-        // Map to DTO to avoid recursion
+
         EmailThreadDTO dto = new EmailThreadDTO(
                 savedThread.getId(),
                 savedThread.getTitle(),
